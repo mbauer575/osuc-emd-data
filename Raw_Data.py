@@ -132,7 +132,7 @@ def merge_df(df1, time_interval):
     else:
         print("[MERGING_INFO]  latest data point:"+df1['Time'].iloc[0])
         df2 = pd.concat([df2, df1],ignore_index = False)
-    return
+    return df2
 
 def check_if_exists(file):
     # Check if file exists, if not create it and name it file.csv
@@ -146,18 +146,15 @@ def check_if_exists(file):
 def  to_csvs(df_5min_master, time_interval):
     check_if_exists(time_interval)
     if time_interval == "day":
-        daily = pd.read_csv(os.getcwd() + '/day.csv')
-        merge_df(df_5min_master,daily)
+        daily = merge_df(df_5min_master,time_interval)
         daily.to_csv(os.getcwd() + '/day.csv', index = False)
         print("[TO_CSV_INFO]  day.csv updated")
     elif time_interval == "week":
-        weekly = pd.read_csv(os.getcwd() + '/week.csv')
-        merge_df(df_5min_master,weekly)
+        weekly = merge_df(df_5min_master,time_interval)
         weekly.to_csv(os.getcwd() + '/week.csv', index = False)
         print("[TO_CSV_INFO]  week.csv updated")
     elif time_interval == "month":
-        merge_df(df_5min_master,time_interval)
-        monthly = pd.read_csv(os.getcwd() + '/month.csv')
+        monthly = merge_df(df_5min_master,time_interval)
         monthly.to_csv(os.getcwd() + '/month.csv', index = False)
         print("[TO_CSV_INFO]  month.csv updated")
     return
