@@ -59,7 +59,7 @@ def daily_data_trim(ID):
     df.columns = meters
     df.to_csv(Fname, index = False)
     
-def fill_master(ID_LIST, Last_Date):
+def fill_5_min_master(ID_LIST, Last_Date):
     df_5min_master = pd.DataFrame()
 
     dfs = [pd.read_csv(os.getcwd() + "/" + file_name(id), index_col=False) for id in ID_LIST]
@@ -120,30 +120,35 @@ def fill_master(ID_LIST, Last_Date):
         fill_master(ID_LIST, Last_Date)
     return df_5min_master
 
-# Function to merge 5 minute dataframe with master
-def merge_master(df_5min_master):
-    master = pd.read_csv(os.getcwd() + '\master.csv')
-    # Merge 5 minute dataframe with master
-    # If time in df_5min_master is not in master, add it to master
-    print("[MERGING_INFO]  latest data point:"+df_5min_master['Time'].iloc[0])
-    # if df_5min_master['Time'].iloc[0] is in master, do not add it to master
-    if df_5min_master['Time'].iloc[0] in master['Time'].values:
-        print("[MERGING_INFO] " + str(df_5min_master['Time'].iloc[0]) + " is already in master")
-    elif master['Time'].isnull().any():
-        print("[MERGING_INFO/CATUTION] master is empty, adding " + df_5min_master['Time'].iloc[0] + " to master")
-        master = pd.concat([master, df_5min_master],ignore_index = False)
+
+# Checks dataframes, checks for duplicates and checks for empty dataframes
+def merge_df(df1, df2):
+    if df1['Time'].iloc[0] in df2['Time'].values:
+        print("[MERGING_INFO/WARN] " + str(df1['Time'].iloc[0]) + " is already in master, skipping...")
+    elif df2['Time'].isnull().any():
+        print("[MERGING_INFO/CATUTION] master is empty, adding " + df1['Time'].iloc[0] + " to master")
+        df2 = pd.concat([df2, df1],ignore_index = False)
     else:
-        master = pd.concat([master, df_5min_master],ignore_index = False)
-    
-    # For testing to check latest data point. Can be helpful to see if data is being collected without 
-    # going thrigh the entire master dataframe
-    # 
-    # df_5min_master.to_csv(os.getcwd() + '\df_5min_master.csv', index = False)
+        print("[MERGING_INFO]  latest data point:"+df1['Time'].iloc[0])
+        df2 = pd.concat([df2, df1],ignore_index = False)
+    return
 
-    # Saves master df to master.csv
-    master.to_csv(os.getcwd() + '\master.csv', index = False)
-    return master, df_5min_master
 
+def  to_csvs(df_5min_master, time_interval):
+    if time_interval == "day":
+        daily = pd.read_csv(os.getcwd() + 'daily.csv')
+        merge_df(df_5min_master,daily)
+        daily.to_csv(os.getcwd() + 'daily.csv', index = False)
+    elif time_interval == "week":
+        weekly = pd.read_csv(os.getcwd() + 'weekly.csv')
+        merge_df(df_5min_master,weekly)
+        weekly.to_csv(os.getcwd() + 'weekly.csv', index = False)
+    elif time_interval == "month":
+        monthly = pd.read_csv(os.getcwd() + 'monthly.csv')
+        merge_df(df_5min_master,monthly)
+        monthly.to_csv(os.getcwd() + 'monthly.csv', index = False)
+
+    return
 
 def file_name(ID):
     now = datetime.now()
@@ -191,6 +196,7 @@ def download_data():
     daily_data_trim(2)
     pullData(keydata["IP_3"],keydata["ftp_user"],keydata["ftp_pass"],"3")
     daily_data_trim(3)
+    return
 
 
 def main():
@@ -200,9 +206,14 @@ def main():
         SERVER_IDS = [1, 2, 3]
         download_data()
         # set fillmaster to true to fill master with only the last data point
-        merged_dadta = fill_master(SERVER_IDS, True)
-        merged_data = merge_master(merged_dadta)
-        # function to send data to s3 database
+        merged_dadta = fill_5_min_master(SERVER_IDS, True)
+        # sends data to csvs
+        # TODO add functionalaty to day week month options.  right now it just fills them all with the same data points
+        # Needs to be addressed
+        to_csvs(merged_dadta, "day")
+        to_csvs(merged_dadta, "week")
+        to_csvs(merged_dadta, "month")
+        # function to send data to Azure Blob Storage
         send_to_space()
         print("[INFO]  "+"Done!")
         time.sleep(280)
