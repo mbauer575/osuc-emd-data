@@ -117,12 +117,13 @@ def fill_5_min_master(ID_LIST, Last_Date):
         # df_5min_master.to_csv("testing.csv", index = False)
         time.sleep(20)
         download_data()
-        fill_master(ID_LIST, Last_Date)
+        fill_5_min_master(ID_LIST, Last_Date)
     return df_5min_master
 
 
 # Checks dataframes, checks for duplicates and checks for empty dataframes
-def merge_df(df1, df2):
+def merge_df(df1, time_interval):
+    df2 = pd.read_csv(os.getcwd() + '/' + time_interval + '.csv')
     if df1['Time'].iloc[0] in df2['Time'].values:
         print("[MERGING_INFO/WARN] " + str(df1['Time'].iloc[0]) + " is already in master, skipping...")
     elif df2['Time'].isnull().any():
@@ -133,21 +134,32 @@ def merge_df(df1, df2):
         df2 = pd.concat([df2, df1],ignore_index = False)
     return
 
+def check_if_exists(file):
+    # Check if file exists, if not create it and name it file.csv
+    if not os.path.isfile(os.getcwd() + '/' + file + '.csv'):
+        print("[INFO]  " + file + ".csv does not exist, creating...")
+        df = pd.DataFrame(columns = ['Date', 'Time', 'Server1_meter1_avg', 'Server1_meter1_min', 'Server1_meter1_max', 'Server1_meter2_avg', 'Server1_meter2_min', 'Server1_meter2_max', 'Server1_meter3_avg', 'Server1_meter3_min', 'Server1_meter3_max', 'Server1_meter4_avg', 'Server1_meter4_min', 'Server1_meter4_max', 'Server1_meter5_avg', 'Server1_meter5_min', 'Server1_meter5_max', 'Server1_meter6_avg', 'Server1_meter6_min', 'Server1_meter6_max', 'Server1_meter7_avg', 'Server1_meter7_min', 'Server1_meter7_max', 'Server1_meter8_avg', 'Server1_meter8_min', 'Server1_meter8_max', 'Server1_meter9_avg', 'Server1_meter9_min', 'Server1_meter9_max', 'Server1_meter10_avg', 'Server1_meter10_min', 'Server1_meter10_max', 'Server1_meter11_avg', 'Server1_meter11_min', 'Server1_meter11_max', 'Server1_meter12_avg', 'Server1_meter12_min', 'Server1_meter12_max', 'Server1_meter13_avg', 'Server1_meter13_min', 'Server1_meter13_max', 'Server2_meter1_avg', 'Server2_meter1_min', 'Server2_meter1_max', 'Server2_meter2_avg', 'Server2_meter2_min', 'Server2_meter2_max', 'Server2_meter3_avg', 'Server2_meter3_min', 'Server2_meter3_max', 'Server2_meter4_avg', 'Server2_meter4_min', 'Server2_meter4_max', 'Server2_meter5_avg', 'Server2_meter5_min', 'Server2_meter5_max', 'Server2_meter6_avg', 'Server2_meter6_min', 'Server2_meter6_max', 'Server3_meter1_avg', 'Server3_meter1_min', 'Server3_meter1_max', 'Server3_meter2_avg', 'Server3_meter2_min', 'Server3_meter2_max', 'Server3_meter3_avg', 'Server3_meter3_min', 'Server3_meter3_max', 'Server3_meter4_avg', 'Server3_meter4_min', 'Server3_meter4_max', 'Server3_meter5_avg', 'Server3_meter5_min', 'Server3_meter5_max', 'Server3_meter6_avg', 'Server3_meter6_min', 'Server3_meter6_max', '1st_Floor', '2nd_Floor', '3rd_Floor', '4th_Floor', 'Utilities', 'TOTAL', '1st_Floor_Kwh', '2nd_Floor_Kwh', '3rd_Floor_Kwh', '4th_Floor_Kwh', 'Utilities_Kwh', 'TOTAL_Kwh'])
+        df.to_csv(os.getcwd() + '/'+file+'.csv', index = False)
+    
+    return
 
 def  to_csvs(df_5min_master, time_interval):
+    check_if_exists(time_interval)
     if time_interval == "day":
-        daily = pd.read_csv(os.getcwd() + 'daily.csv')
+        daily = pd.read_csv(os.getcwd() + '/day.csv')
         merge_df(df_5min_master,daily)
-        daily.to_csv(os.getcwd() + 'daily.csv', index = False)
+        daily.to_csv(os.getcwd() + '/day.csv', index = False)
+        print("[TO_CSV_INFO]  day.csv updated")
     elif time_interval == "week":
-        weekly = pd.read_csv(os.getcwd() + 'weekly.csv')
+        weekly = pd.read_csv(os.getcwd() + '/week.csv')
         merge_df(df_5min_master,weekly)
-        weekly.to_csv(os.getcwd() + 'weekly.csv', index = False)
+        weekly.to_csv(os.getcwd() + '/week.csv', index = False)
+        print("[TO_CSV_INFO]  week.csv updated")
     elif time_interval == "month":
-        monthly = pd.read_csv(os.getcwd() + 'monthly.csv')
-        merge_df(df_5min_master,monthly)
-        monthly.to_csv(os.getcwd() + 'monthly.csv', index = False)
-
+        merge_df(df_5min_master,time_interval)
+        monthly = pd.read_csv(os.getcwd() + '/month.csv')
+        monthly.to_csv(os.getcwd() + '/month.csv', index = False)
+        print("[TO_CSV_INFO]  month.csv updated")
     return
 
 def file_name(ID):
@@ -163,6 +175,8 @@ def remove_csv(file_name): # removes file from cwd
     else:
         print("[FILE_INFO]  "+file_name+' cannot be removed. Does it exist?')
     return
+
+
 def send_to_space():
 # set variables for Azure access
     # load access keys from secrets.json
@@ -214,7 +228,7 @@ def main():
         to_csvs(merged_dadta, "week")
         to_csvs(merged_dadta, "month")
         # function to send data to Azure Blob Storage
-        send_to_space()
+        # send_to_space()
         print("[INFO]  "+"Done!")
         time.sleep(280)
         print("[INFO]  refreshing in 20 seconds...")
