@@ -9,7 +9,7 @@ Current state:
 
 Requirements:
 - Use pip install -r requirements.txt
-- Must have appkeys.json file to run.
+- Must have appkeys.json file to run locally 
 
 To run:
 - python3 Raw_Data.py
