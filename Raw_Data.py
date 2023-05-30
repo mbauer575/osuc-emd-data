@@ -4,6 +4,7 @@ import json
 import boto3
 from datetime import datetime
 import pandas as pd
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 #from keys import get_server_key, set_server_key
 
 #pullData function takes in the IP address, username, password, 
@@ -119,7 +120,7 @@ def fill_master(ID_LIST, Last_Date):
         fill_master(ID_LIST, Last_Date)
     return df_5min_master
 
-
+# Function to merge 5 minute dataframe with master
 def merge_master(df_5min_master):
     master = pd.read_csv(os.getcwd() + '\master.csv')
     # Merge 5 minute dataframe with master
@@ -134,9 +135,12 @@ def merge_master(df_5min_master):
     else:
         master = pd.concat([master, df_5min_master],ignore_index = False)
     
-    
+    # For testing to check latest data point. Can be helpful to see if data is being collected without 
+    # going thrigh the entire master dataframe
+    # 
+    # df_5min_master.to_csv(os.getcwd() + '\df_5min_master.csv', index = False)
 
-    df_5min_master.to_csv(os.getcwd() + '\df_5min_master.csv', index = False)
+    # Saves master df to master.csv
     master.to_csv(os.getcwd() + '\master.csv', index = False)
     return master, df_5min_master
 
@@ -155,20 +159,24 @@ def remove_csv(file_name): # removes file from cwd
         print("[FILE_INFO]  "+file_name+' cannot be removed. Does it exist?')
     return
 def send_to_space():
-    # send to s3
-    # set variables for AWS access
-    f = open('appkeys.json')
-    data = json.load(f)
-    #set variable x to the value of the ID key in meterkeys dictionary
-    x = data["port"]
+# set variables for Azure access
+    # load access keys from secrets.json
+    with open('appkeys.json') as f:
+        secrets = json.load(f)
+    ACCOUNT_NAME = secrets["ACCOUNT_NAME"]
+    ACCOUNT_KEY = secrets["ACCOUNT_KEY"]
+    CONTAINER_NAME = secrets["CONTAINER_NAME"]
 
+    # create a BlobServiceClient object and authenticate with your Storage account key
+    blob_service_client = BlobServiceClient(account_url=f"https://{ACCOUNT_NAME}.blob.core.windows.net", credential=ACCOUNT_KEY)
 
-    session = boto3.Session(
-        aws_access_key_id= data["aws_access_key_id"],
-        aws_secret_access_key= data["aws_secret_access_key"],
-    )
-    s3 = session.resource('s3')
-    s3.meta.client.upload_file(Filename=os.getcwd() + '\master.csv',Bucket= 'cascades-energy-bucket',Key ='master.csv')
+    # get a reference to the Blob container
+    container_client = blob_service_client.get_container_client(CONTAINER_NAME)
+
+    # upload the file to Blob storage
+    with open("master.csv", "rb") as data:
+        blob_client = container_client.upload_blob(name="master.csv", data=data, overwrite=True)
+
     # remove csvs
     return
 
@@ -197,7 +205,7 @@ def main():
         # function to send data to s3 database
         send_to_space()
         print("[INFO]  "+"Done!")
-        # time.sleep(280)
+        time.sleep(280)
         print("[INFO]  refreshing in 20 seconds...")
         time.sleep(20)
 
