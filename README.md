@@ -16,4 +16,7 @@ To run:
 
 TODO:
 - Make Time periods work. 
+- Store Keys in a more secure way than .json file (maybe use Azure Key Vault)
+- Add more error handling
+- Add more logging maybe to an external file
 - Organize funcitons, Download functions are kind of messy
