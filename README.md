@@ -5,6 +5,8 @@
 Current state: 
 - Will download from servers while connected via LAN only.  
 - Uploads to Azure container via blob storage
+- Will update day week and month csvs with all data 
+- does not update to Azure yet.  waiting on further functionality of day week month csvs. 
 
 
 Requirements:
