@@ -1,7 +1,6 @@
 import os
 import time
 import json
-import boto3
 from datetime import datetime
 import pandas as pd
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
@@ -165,15 +164,15 @@ def file_name(ID):
     return "Trend_Virtual_Meter_Watt_"+Fdate+"_"+str(ID)+".csv"
 
 def remove_csv(file_name): # removes file from cwd
-    path = os.getcwd()+ "\\" + file_name
-    if os.path.exists(path):
-        os.remove(path)
+    pathnm = os.getcwd()+ "\\" + file_name
+    if os.path.exists(pathnm):
+        os.remove(pathnm)
         print("[FILE_INFO]  "+file_name+' cleared')
     else:
         print("[FILE_INFO]  "+file_name+' cannot be removed. Does it exist?')
     return
 
-
+# function to send data to Azure Blob Storage
 def send_to_space():
 # set variables for Azure access
     # load access keys from secrets.json
@@ -224,7 +223,6 @@ def main():
         to_csvs(merged_dadta, "day")
         to_csvs(merged_dadta, "week")
         to_csvs(merged_dadta, "month")
-        # function to send data to Azure Blob Storage
         # send_to_space()
         print("[INFO]  "+"Done!")
         time.sleep(280)
