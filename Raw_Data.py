@@ -181,7 +181,7 @@ def main():
         download_data()
         rocket = calculated_data(SERVER_IDS)
         # function to send data to Azure SQL Database
-        send_to_space(rocket, True)
+        send_to_space(rocket)
         print("[INFO]  "+" Rocket Liftoff!")
         # get_from_space()
         print("[INFO]  "+"sleeping until next data pull...")
