@@ -1,5 +1,6 @@
 # Application Keys
 appkeys.json
+.env
 
 # Distribution / packaging
 .Python

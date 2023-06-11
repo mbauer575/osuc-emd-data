@@ -2,4 +2,8 @@ pandas
 numpy
 pysftp
 datetime
-boto3
+pyodbc
+fastapi
+uvicorn[standard]
+pydantic
+azure-identity

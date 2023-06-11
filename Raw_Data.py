@@ -1,12 +1,10 @@
 import os
 import time
 import json
-import boto3
 from datetime import datetime
 import pandas as pd
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-#from keys import get_server_key, set_server_key
-
+import pyodbc, struct
+from azure.identity import DefaultAzureCredential
 #pullData function takes in the IP address, username, password, 
 # and server number and saves todays file to the current directory
 def pullData(FTP_HOST,FTP_USER,FTP_PASS,SERVER_NUM):
@@ -34,45 +32,48 @@ def pullData(FTP_HOST,FTP_USER,FTP_PASS,SERVER_NUM):
         sftp.get("Trend_Virtual_Meter_Watt_"+Fdate+".csv")
         print("[DOWNLOAD_INFO]  "+"Download successful")
         os.rename("Trend_Virtual_Meter_Watt_"+Fdate+".csv","Trend_Virtual_Meter_Watt_"+Fdate+"_"+str(SERVER_NUM)+".csv")
-
+# daily_data_trim() is a function that trims the extre date and time columns from the data and renames them so there are no conflicts
 def daily_data_trim(ID):
     Fname = file_name(ID)
-
     df = pd.read_csv(Fname, header = 0)
     remove_csv(Fname)
-
     # Find number of columns with data
     search_row = df.iloc[1,:].dropna()
     num_col = len(search_row)
     num_meters = int((num_col-2) / 3)
-
     meters = ['Date', 'Time']
-
     # Make list to rename column titles
     for i in range(num_meters):
         meters.append("Server" + str(ID) + "_" + "meter" + str(i+1) + "_avg")
         meters.append("Server" + str(ID) + "_" + "meter" + str(i+1) + "_min")
         meters.append("Server" + str(ID) + "_" + "meter" + str(i+1) + "_max")
-
     # Preparing and saving csv
     df = df.iloc[:,:num_col]
     df.columns = meters
     df.to_csv(Fname, index = False)
-    
-def fill_5_min_master(ID_LIST, Last_Date):
-    df_5min_master = pd.DataFrame()
 
+
+def calculated_data(ID_LIST, fill_mode=False):
+    df_5min_master = pd.DataFrame()
     dfs = [pd.read_csv(os.getcwd() + "/" + file_name(id), index_col=False) for id in ID_LIST]
     df_5min_master = pd.concat(dfs, axis = 1)
     df_5min_master = df_5min_master.loc[:,~df_5min_master.columns.duplicated(keep='first')].copy()
-    #Last_Date means only the last 5 minute point is appeaned to the master
-    if Last_Date == True:
+    # Data checking and removal
+    if fill_mode == False:
         df_5min_master = df_5min_master.iloc[-3,:]
-        # print(df_5min_master)
         df_5min_master = df_5min_master.to_frame().T
-        # print(df_5min_master)
+    if df_5min_master.isnull().values.any() and fill_mode == False:
+        # Wait 20 seconds and try to collect data agian then recalculate 
+        print("[CAUTION/WARN]  "+"Missing Data...Waiting 20 seconds to try again...")
+        time.sleep(20)
+        download_data()
+        calculated_data(ID_LIST)
+    elif df_5min_master.isnull().values.any() and fill_mode == True:
+        # Find any rows with missing data and delete the whole row
+        print("[CAUTION/WARN]  "+"Missing Data...Deleting rows with missing data...")
+        df_5min_master = df_5min_master.dropna(axis=0, how='any')
 
-            
+    # Data checking complete, now calculate the data
     # absolute value the data in columns titled "Server1_meter10_avg" and "Server1_meter10_min" and "Server1_meter10_max"
     df_5min_master['Server1_meter10_avg'] = df_5min_master['Server1_meter10_avg'].abs()
     df_5min_master['Server1_meter10_min'] = df_5min_master['Server1_meter10_min'].abs()
@@ -94,67 +95,18 @@ def fill_5_min_master(ID_LIST, Last_Date):
     df_5min_master['4th_Floor_Kwh'] = df_5min_master['4th_Floor'] * 5 / 60 / 1000
     df_5min_master['Utilities_Kwh'] = df_5min_master['Utilities'] * 5 / 60 / 1000
     df_5min_master['TOTAL_Kwh'] = df_5min_master['TOTAL'] * 5 / 60 / 1000
+    
+    df_5min_calc = pd.DataFrame()
 
-    # May not be needed
-    # number of rooms on each floor:
-    # first_rooms = 22
-    # second_rooms = 49
-    # third_rooms = 49
-    # fourth_rooms = 35
+    df_5min_calc = df_5min_master[['Date', 'Time', '1st_Floor', '2nd_Floor', '3rd_Floor', '4th_Floor', 'Utilities', 'TOTAL', '1st_Floor_Kwh', '2nd_Floor_Kwh', '3rd_Floor_Kwh', '4th_Floor_Kwh', 'Utilities_Kwh', 'TOTAL_Kwh']].copy()
+    return df_5min_calc
 
-    # # calculate the Kwh per room for each floor
-    # df_5min_master['1st_Floor_Kwh_per_room'] = df_5min_master['1st_Floor_Kwh'] / first_rooms
-    # df_5min_master['2nd_Floor_Kwh_per_room'] = df_5min_master['2nd_Floor_Kwh'] / second_rooms
-    # df_5min_master['3rd_Floor_Kwh_per_room'] = df_5min_master['3rd_Floor_Kwh'] / third_rooms
-    # df_5min_master['4th_Floor_Kwh_per_room'] = df_5min_master['4th_Floor_Kwh'] / fourth_rooms
-
-    # Check to see if there are nan values in 5-minute dataframe and if Last_Date is True (meaning only the last 5 minute point is being appended to the master)
-    if df_5min_master.isnull().values.any() and Last_Date == True:
-        # Wait 20 seconds and try again to collect data
-        print("[CAUTION/WARN]  "+"Missing Data...Waiting 20 seconds to try again...")
-        # print(df_5min_master)
-        #send df_5min_master to csv file named testing
-        # df_5min_master.to_csv("testing.csv", index = False)
-        time.sleep(20)
-        download_data()
-        fill_master(ID_LIST, Last_Date)
-    return df_5min_master
-
-
-# Checks dataframes, checks for duplicates and checks for empty dataframes
-def merge_df(df1, df2):
-    if df1['Time'].iloc[0] in df2['Time'].values:
-        print("[MERGING_INFO/WARN] " + str(df1['Time'].iloc[0]) + " is already in master, skipping...")
-    elif df2['Time'].isnull().any():
-        print("[MERGING_INFO/CATUTION] master is empty, adding " + df1['Time'].iloc[0] + " to master")
-        df2 = pd.concat([df2, df1],ignore_index = False)
-    else:
-        print("[MERGING_INFO]  latest data point:"+df1['Time'].iloc[0])
-        df2 = pd.concat([df2, df1],ignore_index = False)
-    return
-
-
-def  to_csvs(df_5min_master, time_interval):
-    if time_interval == "day":
-        daily = pd.read_csv(os.getcwd() + 'daily.csv')
-        merge_df(df_5min_master,daily)
-        daily.to_csv(os.getcwd() + 'daily.csv', index = False)
-    elif time_interval == "week":
-        weekly = pd.read_csv(os.getcwd() + 'weekly.csv')
-        merge_df(df_5min_master,weekly)
-        weekly.to_csv(os.getcwd() + 'weekly.csv', index = False)
-    elif time_interval == "month":
-        monthly = pd.read_csv(os.getcwd() + 'monthly.csv')
-        merge_df(df_5min_master,monthly)
-        monthly.to_csv(os.getcwd() + 'monthly.csv', index = False)
-
-    return
 
 def file_name(ID):
     now = datetime.now()
     Fdate= now.strftime("%Y%m%d")
     return "Trend_Virtual_Meter_Watt_"+Fdate+"_"+str(ID)+".csv"
-
+def delete_file():
 def remove_csv(file_name): # removes file from cwd
     path = os.getcwd()+ "\\" + file_name
     if os.path.exists(path):
@@ -163,33 +115,55 @@ def remove_csv(file_name): # removes file from cwd
     else:
         print("[FILE_INFO]  "+file_name+' cannot be removed. Does it exist?')
     return
-def send_to_space():
-# set variables for Azure access
-    # load access keys from secrets.json
-    with open('appkeys.json') as f:
-        secrets = json.load(f)
-    ACCOUNT_NAME = secrets["ACCOUNT_NAME"]
-    ACCOUNT_KEY = secrets["ACCOUNT_KEY"]
-    CONTAINER_NAME = secrets["CONTAINER_NAME"]
-
-    # create a BlobServiceClient object and authenticate with your Storage account key
-    blob_service_client = BlobServiceClient(account_url=f"https://{ACCOUNT_NAME}.blob.core.windows.net", credential=ACCOUNT_KEY)
-
-    # get a reference to the Blob container
-    container_client = blob_service_client.get_container_client(CONTAINER_NAME)
-
-    # upload the file to Blob storage
-    with open("master.csv", "rb") as data:
-        blob_client = container_client.upload_blob(name="master.csv", data=data, overwrite=True)
-
-    # remove csvs
+def get_from_space():
+    rows = []
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM testing")
+        rows = cursor.fetchall()
+        for row in rows:
+            print(row)
     return
 
+def send_to_space(df_5_min_master):
+    # set variables for Azure access
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        print("sending to space:")
+        print(df_5_min_master)
+        for index, row in df_5_min_master.iterrows():
+            try:
+                cursor.execute("INSERT INTO testing (Date, Time, First_Floor, Second_Floor, Third_Floor, Fourth_Floor, Utilities, TOTAL, First_Floor_Kwh, Second_Floor_Kwh, Third_Floor_Kwh, Fourth_Floor_Kwh, Utilities_Kwh, TOTAL_Kwh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", row['Date'], row['Time'], row['1st_Floor'], row['2nd_Floor'], row['3rd_Floor'], row['4th_Floor'], row['Utilities'], row['TOTAL'], row['1st_Floor_Kwh'], row['2nd_Floor_Kwh'], row['3rd_Floor_Kwh'], row['4th_Floor_Kwh'], row['Utilities_Kwh'], row['TOTAL_Kwh'])
+            except Exception as e:
+                print("Error executing SQL statement: {}".format(e))
+    return
+
+    
+    # remove csvs
+    return
+def get_conn():
+    # Load the connection string and Azure credentials from appkeys.json
+    with open('appkeys.json') as f:
+        appkeys = json.load(f)
+    connection_string = appkeys["AZURE_SQL_CONNECTIONSTRING"]
+    credential = DefaultAzureCredential()
+
+    # Get an access token for the Azure SQL Database
+    token = credential.get_token("https://database.windows.net/")
+
+    # Set the access token in the connection string
+    conn_str = connection_string.format(token=token.token)
+
+    # Connect to the Azure SQL Database
+    conn = pyodbc.connect(conn_str)
+
+    return conn
 def download_data():
     keys= open('appkeys.json')
     keydata = json.load(keys)
-
+    # daily_data_trim() is a function that trims the extre date and time columns from the data and renames them so there are no conflicts
     print("[STARTUP_INFO]  "+"starting data collection...")
+    # for loop that repeats
     pullData(keydata["IP_1"],keydata["ftp_user"],keydata["ftp_pass"],"1")
     daily_data_trim(1)
     pullData(keydata["IP_2"],keydata["ftp_user"],keydata["ftp_pass"],"2")
@@ -205,19 +179,16 @@ def main():
     while True:
         SERVER_IDS = [1, 2, 3]
         download_data()
-        # set fillmaster to true to fill master with only the last data point
-        merged_dadta = fill_5_min_master(SERVER_IDS, True)
-        # sends data to csvs
-        # TODO add functionalaty to day week month options.  right now it just fills them all with the same data points
-        # Needs to be addressed
-        to_csvs(merged_dadta, "day")
-        to_csvs(merged_dadta, "week")
-        to_csvs(merged_dadta, "month")
-        # function to send data to Azure Blob Storage
-        send_to_space()
-        print("[INFO]  "+"Done!")
+        rocket = calculated_data(SERVER_IDS, False)
+        delete_files()
+        # function to send data to Azure SQL Database
+        send_to_space(rocket)
+        print("[INFO]  "+" Rocket Liftoff!")
+        # get_from_space()
+        print("[INFO]  "+"sleeping until next data pull...")
         time.sleep(280)
         print("[INFO]  refreshing in 20 seconds...")
         time.sleep(20)
+    return
 
 main()
