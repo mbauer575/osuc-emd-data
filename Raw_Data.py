@@ -106,7 +106,7 @@ def file_name(ID):
     now = datetime.now()
     Fdate= now.strftime("%Y%m%d")
     return "Trend_Virtual_Meter_Watt_"+Fdate+"_"+str(ID)+".csv"
-def delete_file():
+
 def remove_csv(file_name): # removes file from cwd
     path = os.getcwd()+ "\\" + file_name
     if os.path.exists(path):
@@ -179,10 +179,9 @@ def main():
     while True:
         SERVER_IDS = [1, 2, 3]
         download_data()
-        rocket = calculated_data(SERVER_IDS, False)
-        delete_files()
+        rocket = calculated_data(SERVER_IDS)
         # function to send data to Azure SQL Database
-        send_to_space(rocket)
+        send_to_space(rocket, True)
         print("[INFO]  "+" Rocket Liftoff!")
         # get_from_space()
         print("[INFO]  "+"sleeping until next data pull...")

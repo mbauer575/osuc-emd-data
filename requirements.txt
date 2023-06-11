@@ -2,8 +2,12 @@ pandas
 numpy
 pysftp
 datetime
+<<<<<<< HEAD
 pyodbc
 fastapi
 uvicorn[standard]
 pydantic
 azure-identity
+=======
+azure.storage.blob
+>>>>>>> 6a0984576eefabdd19352bd37ca3a433f99d0619
