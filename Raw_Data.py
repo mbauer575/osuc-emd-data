@@ -218,6 +218,9 @@ def check_for_duplicates(T, old, new):
     elif T == "SOFT":
         # checks for duplicates in archived df_5min_master
         print("soft check")
+        if old.equals(new):
+            print("[DUPLICATE_INFO]  "+"No new data")
+            return
 
 
 def main(startup_database=False):
@@ -233,8 +236,11 @@ def main(startup_database=False):
         SERVER_IDS = [1, 2, 3]
         download_data()
         rocket = calculated_data(SERVER_IDS)
+        if old_rocket == None:
+            old_rocket = rocket
         check_for_duplicates("SOFT", old_rocket, rocket)
         old_rocket = rocket
+        
         # function to send data to Azure SQL Database
         send_to_space(rocket)
         print("[INFO]  "+" Rocket Liftoff!")
