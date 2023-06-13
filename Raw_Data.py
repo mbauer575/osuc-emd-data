@@ -5,7 +5,6 @@ import json
 from datetime import datetime
 import pandas as pd
 import pyodbc
-import struct
 from azure.identity import DefaultAzureCredential
 # pullData function takes in the IP address, username, password,
 # and server number and saves todays file to the current directory
@@ -234,7 +233,7 @@ def check_for_duplicates(T, old, new):
 
 def main(argv):
     old_rocket = None
-    startup_database = bool(sys.argv[1])
+    startup_database = bool(argv)
     if startup_database == True:
         print("[STARTUP_INFO]  "+"Creating database table.")
         # *** to change database name go to setup_database() ***
@@ -262,4 +261,4 @@ def main(argv):
     return
 
 
-main()
+main(sys.argv[1:])
