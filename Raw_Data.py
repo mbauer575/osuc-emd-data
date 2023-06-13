@@ -4,7 +4,7 @@ import time
 import json
 from datetime import datetime
 import pandas as pd
-import pyodbc
+import pyodbc, struct
 from azure.identity import DefaultAzureCredential
 # pullData function takes in the IP address, username, password,
 # and server number and saves todays file to the current directory
@@ -144,11 +144,11 @@ def get_from_space():
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT TOP 1 * FROM testing ORDER BY CONCAT(Date, ' ', Time) DESC")
+            "SELECT TOP 1 * FROM energy_data ORDER BY CONCAT(Date, ' ', Time) DESC")
         rows = cursor.fetchall()
         for row in rows:
             print(row)
-    return row
+        return rows
 
 
 def send_to_space(df_5_min_master):
@@ -156,10 +156,10 @@ def send_to_space(df_5_min_master):
     with get_conn() as conn:
         cursor = conn.cursor()
         print("sending to space:")
-        print(df_5_min_master)
+        # print(df_5_min_master)
         for index, row in df_5_min_master.iterrows():
             try:
-                cursor.execute("INSERT INTO testing (Date, Time, First_Floor, Second_Floor, Third_Floor, Fourth_Floor, Utilities, TOTAL, First_Floor_Kwh, Second_Floor_Kwh, Third_Floor_Kwh, Fourth_Floor_Kwh, Utilities_Kwh, TOTAL_Kwh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT INTO energy_data (Date, Time, First_Floor, Second_Floor, Third_Floor, Fourth_Floor, Utilities, TOTAL, First_Floor_Kwh, Second_Floor_Kwh, Third_Floor_Kwh, Fourth_Floor_Kwh, Utilities_Kwh, TOTAL_Kwh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                row['Date'], row['Time'], row['1st_Floor'], row['2nd_Floor'], row['3rd_Floor'], row['4th_Floor'], row['Utilities'], row['TOTAL'], row['1st_Floor_Kwh'], row['2nd_Floor_Kwh'], row['3rd_Floor_Kwh'], row['4th_Floor_Kwh'], row['Utilities_Kwh'], row['TOTAL_Kwh'])
             except Exception as e:
                 print("Error executing SQL statement: {}".format(e))
@@ -185,6 +185,7 @@ def get_conn():
     # Connect to the Azure SQL Database
     conn = pyodbc.connect(conn_str)
 
+
     return conn
 
 
@@ -207,7 +208,7 @@ def setup_database():
     rows = []
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("CREATE TABLE testing (Date DATE,Time TIME,First_Floor FLOAT,Second_Floor FLOAT,Third_Floor FLOAT,Fourth_Floor FLOAT,Utilities FLOAT,TOTAL FLOAT,First_Floor_Kwh FLOAT,Second_Floor_Kwh FLOAT,Third_Floor_Kwh FLOAT,Fourth_Floor_Kwh FLOAT,Utilities_Kwh FLOAT,TOTAL_Kwh FLOAT)")
+        cursor.execute("CREATE TABLE energy_data (Date DATE,Time TIME,First_Floor FLOAT,Second_Floor FLOAT,Third_Floor FLOAT,Fourth_Floor FLOAT,Utilities FLOAT,TOTAL FLOAT,First_Floor_Kwh FLOAT,Second_Floor_Kwh FLOAT,Third_Floor_Kwh FLOAT,Fourth_Floor_Kwh FLOAT,Utilities_Kwh FLOAT,TOTAL_Kwh FLOAT)")
     return
 
 
@@ -249,7 +250,12 @@ def main(argv):
         rocket = calculated_data(SERVER_IDS)
         
         # checks for duplicates in and sends only if new data is present
-        data_check=check_for_duplicates("SOFT", old_rocket, rocket)
+        if startup_database == False:
+            data_check=check_for_duplicates("SOFT", old_rocket, rocket)
+        elif startup_database == True: 
+            # on startup unable to check for duplicates beacuse its empty, send anyway
+            data_check= True
+        # data_check must be true to send data to database
         if data_check == True:
             send_to_space(rocket)
             old_rocket = rocket
