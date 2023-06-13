@@ -215,6 +215,7 @@ def check_for_duplicates(T, old, new):
     if T == "HARD":
         # checks for duplicates in SQL table
         get_from_space()
+
     elif T == "SOFT":
         # checks for duplicates in archived df_5min_master
         print("soft check")
@@ -226,6 +227,7 @@ def main(startup_database=False):
         print("[STARTUP_INFO]  "+"Creating database table.")
         # *** to change database name go to setup_database() ***
         setup_database()
+        startup_database = False
     else:
         print("[STARTUP_INFO]  "+"Assumeing table already exists.")
 
