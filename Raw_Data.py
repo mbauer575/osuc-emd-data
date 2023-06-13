@@ -212,24 +212,38 @@ def setup_database():
     return
 
 
-def check_for_duplicates(T, old, new):
-    # return true if there are no duplicates and false if there are
-    if T == "HARD":
-        # checks for duplicates in SQL table
+def check_for_duplicates(old, new):
+    if old is None:
         old = get_from_space()
-        if old.equals(new):
-            print("[DUPLICATE_WARN]  "+"No new data")
-            return False
-        else: 
+        if len(old) == 0:
+            print("[DATABASE] No data in database")
             return True
 
-    elif T == "SOFT":
-        # checks for duplicates in archived df_5min_master
-        print("soft check")
-        if old.equals(new):
-            print("[DUPLICATE_WARN]  "+"No new data")
+    if isinstance(old, list):
+        print("printing old")
+        print(old)
+        print("printing new")
+        print(new)
+        old_latest_date = old[0][0]
+        print("old latest date: "+str(old_latest_date))
+        old_latest_time = old[0][1]
+        print("old latest time: "+str(old_latest_time))
+        new_latest_date = new['Date'].iloc[0]
+        print("new latest date: "+str(new_latest_date))
+        new_latest_time = new['Time'].iloc[0]
+        print("new latest time: "+str(new_latest_time))
+
+        if old_latest_date == new_latest_date and old_latest_time == new_latest_time:
+            print("[DUPLICATE_WARN] No new data")
             return False
-        else: 
+        else:
+            return True
+
+    elif isinstance(old, pd.DataFrame):
+        if old.equals(new):
+            print("[DUPLICATE_WARN] No new data")
+            return False
+        else:
             return True
 
 def main(argv):
@@ -243,15 +257,13 @@ def main(argv):
         print("[STARTUP_INFO]  "+"Assumeing table already exists.")
 
     while True:
-        if old_rocket == None and startup_database == False:
-            old_rocket = get_from_space()
         SERVER_IDS = [1, 2, 3]
         download_data()
         rocket = calculated_data(SERVER_IDS)
         
         # checks for duplicates in and sends only if new data is present
         if startup_database == False:
-            data_check=check_for_duplicates("SOFT", old_rocket, rocket)
+            data_check=check_for_duplicates(old_rocket, rocket)
         elif startup_database == True: 
             # on startup unable to check for duplicates beacuse its empty, send anyway
             data_check= True
