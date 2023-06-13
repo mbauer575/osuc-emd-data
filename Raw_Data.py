@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import json
 from datetime import datetime
@@ -148,7 +149,7 @@ def get_from_space():
         rows = cursor.fetchall()
         for row in rows:
             print(row)
-    return
+    return row
 
 
 def send_to_space(df_5_min_master):
@@ -212,41 +213,48 @@ def setup_database():
 
 
 def check_for_duplicates(T, old, new):
+    # return true if there are no duplicates and false if there are
     if T == "HARD":
         # checks for duplicates in SQL table
-        get_from_space()
+        old = get_from_space()
+        if old.equals(new):
+            print("[DUPLICATE_WARN]  "+"No new data")
+            return False
+        else: 
+            return True
 
     elif T == "SOFT":
         # checks for duplicates in archived df_5min_master
         print("soft check")
         if old.equals(new):
-            print("[DUPLICATE_INFO]  "+"No new data")
-            return
+            print("[DUPLICATE_WARN]  "+"No new data")
+            return False
+        else: 
+            return True
 
-
-def main(startup_database=False):
+def main(argv):
     old_rocket = None
+    startup_database = bool(sys.argv[1])
     if startup_database == True:
         print("[STARTUP_INFO]  "+"Creating database table.")
         # *** to change database name go to setup_database() ***
         setup_database()
-        startup_database = False
     else:
         print("[STARTUP_INFO]  "+"Assumeing table already exists.")
 
     while True:
+        if old_rocket == None and startup_database == False:
+            old_rocket = get_from_space()
         SERVER_IDS = [1, 2, 3]
         download_data()
         rocket = calculated_data(SERVER_IDS)
-        if old_rocket == None:
-            old_rocket = rocket
-        check_for_duplicates("SOFT", old_rocket, rocket)
-        old_rocket = rocket
         
-        # function to send data to Azure SQL Database
-        send_to_space(rocket)
-        print("[INFO]  "+" Rocket Liftoff!")
-        # get_from_space()
+        # checks for duplicates in and sends only if new data is present
+        data_check=check_for_duplicates("SOFT", old_rocket, rocket)
+        if data_check == True:
+            send_to_space(rocket)
+            old_rocket = rocket
+            print("[INFO]  "+" Rocket Liftoff!")
         print("[INFO]  "+"sleeping until next data pull...")
         time.sleep(280)
         print("[INFO]  refreshing in 20 seconds...")
