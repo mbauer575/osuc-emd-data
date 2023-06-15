@@ -5,7 +5,7 @@
 Current state: 
 - Will download from servers while connected to OSU Private network
 - Does some calculations on data and saves nessasary information to AZURE DATABASE
-- Duplicate data checking only works while its running. May send same datapoint when newly started up. 
+- Duplicate data checking only works while its running. May send same datapoint when program is restarted. 
 
 Requirements:
 - Use pip install -r requirements.txt
@@ -24,5 +24,5 @@ Setup with Azure SQL Database instructions:
 6. On second startup you may have issues with duplicate data
 
 To run:
-- First run: python3 Raw_Data.py True
-- After setup: python3 Raw_Data.py 
+- First run use command: 'python3 Raw_Data.py True'
+- After first run use command: 'python3 Raw_Data.py'
