@@ -72,14 +72,18 @@ def calculated_data(ID_LIST, fill_mode=False):
         pd.read_csv(os.getcwd() + "/" + file_name(id), index_col=False)
         for id in ID_LIST
     ]
-    df_5min_master = pd.concat(dfs, axis=1)
+    df_5min_master = dfs[0]
+    for df in dfs[1:]:
+        df_5min_master = pd.merge(df_5min_master, df, on="Time", how="outer")
     df_5min_master = df_5min_master.loc[
         :, ~df_5min_master.columns.duplicated(keep="first")
     ].copy()
     # Data checking and removal
     if fill_mode == False:
         df_5min_master = df_5min_master.iloc[-3, :]
+        print("[INFO]  " + "Data collected at " + str(df_5min_master["Time"]))
         df_5min_master = df_5min_master.to_frame().T
+        df_5min_master.to_csv("df_5min_master.csv", index=False)
     if df_5min_master.isnull().values.any() and fill_mode == False:
         # Wait 20 seconds and try to collect data agian then recalculate
         print("[CAUTION/WARN]  " + "Missing Data...Waiting 20 seconds to try again...")
@@ -95,11 +99,7 @@ def calculated_data(ID_LIST, fill_mode=False):
 
     # combine date and time into dateTime column
     df_5min_master["Date"] = pd.to_datetime(df_5min_master["Date"], format="%m/%d/%Y")
-    df_5min_master["Time"] = pd.to_datetime(df_5min_master["Time"], format="%H:%M:%S")
-    df_5min_master["Time"] = df_5min_master["Time"].dt.time
-    df_5min_master["Date"] = df_5min_master["Date"].dt.date
-    df_5min_master["Date"] = pd.to_datetime(df_5min_master["Date"])
-    df_5min_master["Time"] = pd.to_datetime(df_5min_master["Time"])
+    df_5min_master["Time"] = pd.to_datetime(df_5min_master["Time"], format="%H:%M")
     df_5min_master["Time"] = df_5min_master["Time"].dt.time
     df_5min_master["Date"] = df_5min_master["Date"].dt.date
     df_5min_master["dateTime"] = pd.to_datetime(
@@ -285,9 +285,9 @@ def setup_database(db_table_name):
     return
 
 
-def check_for_duplicates(old, new):
+def check_for_duplicates(old, new,db_table_name):
     if old is None:
-        old = get_from_space()
+        old = get_from_space(db_table_name)
         if len(old) == 0:
             print("[DATABASE] No data in database")
             return True
@@ -334,7 +334,7 @@ def main(argv):
 
         # checks for duplicates in and sends only if new data is present
         if startup_database == False:
-            data_check = check_for_duplicates(old_rocket, rocket)
+            data_check = check_for_duplicates(old_rocket, rocket, table_name)
         elif startup_database == True:
             # on startup unable to check for duplicates beacuse its empty, send anyway
             data_check = True
