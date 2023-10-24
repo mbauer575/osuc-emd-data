@@ -4,6 +4,7 @@ appkeys.json
 
 # Distribution / packaging
 .Python
+.DS_Store
 build/
 dist/
 downloads/
