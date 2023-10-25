@@ -74,7 +74,7 @@ def calculated_data(ID_LIST, fill_mode=False):
     ]
     df_5min_master = dfs[0]
     for df in dfs[1:]:
-        df_5min_master = pd.merge(df_5min_master, df, on="Time", how="outer")
+        df_5min_master = pd.merge(df_5min_master, df, on=["Date", "Time"], how="outer")
     df_5min_master = df_5min_master.loc[
         :, ~df_5min_master.columns.duplicated(keep="first")
     ].copy()
@@ -83,7 +83,6 @@ def calculated_data(ID_LIST, fill_mode=False):
         df_5min_master = df_5min_master.iloc[-3, :]
         print("[INFO]  " + "Data collected at " + str(df_5min_master["Time"]))
         df_5min_master = df_5min_master.to_frame().T
-        df_5min_master.to_csv("df_5min_master.csv", index=False)
     if df_5min_master.isnull().values.any() and fill_mode == False:
         # Wait 20 seconds and try to collect data agian then recalculate
         print("[CAUTION/WARN]  " + "Missing Data...Waiting 20 seconds to try again...")
@@ -98,16 +97,10 @@ def calculated_data(ID_LIST, fill_mode=False):
     # Data checking complete, continue with calculations
 
     # combine date and time into dateTime column
-    df_5min_master["Date"] = pd.to_datetime(df_5min_master["Date"], format="%m/%d/%Y")
-    df_5min_master["Time"] = pd.to_datetime(df_5min_master["Time"], format="%H:%M")
-    df_5min_master["Time"] = df_5min_master["Time"].dt.time
-    df_5min_master["Date"] = df_5min_master["Date"].dt.date
     df_5min_master["dateTime"] = pd.to_datetime(
-        df_5min_master.pop("Date").astype(str)
-        + " "
-        + df_5min_master.pop("Time").astype(str)
+        df_5min_master["Date"] + " " + df_5min_master["Time"]
     )
-
+    df_5min_master.to_csv("test.csv")
     # absolute value the data in columns titled "Server1_meter10_avg" and "Server1_meter10_min" and "Server1_meter10_max"
     df_5min_master["Server1_meter10_avg"] = df_5min_master["Server1_meter10_avg"].abs()
     df_5min_master["Server1_meter10_min"] = df_5min_master["Server1_meter10_min"].abs()
@@ -218,7 +211,7 @@ def send_to_space(df_5_min_master, db_table_name):
         for index, row in df_5_min_master.iterrows():
             try:
                 cursor.execute(
-                    f"INSERT INTO {db_table_name} (dateTime, First_Floor, Second_Floor, Third_Floor, Fourth_Floor, Utilities, TOTAL, First_Floor_Kwh, Second_Floor_Kwh, Third_Floor_Kwh, Fourth_Floor_Kwh, Utilities_Kwh, TOTAL_Kwh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    f"INSERT INTO {db_table_name} (dateTime, First_Floor, Second_Floor, Third_Floor, Fourth_Floor, Utilities, TOTAL, First_Floor_Kwh, Second_Floor_Kwh, Third_Floor_Kwh, Fourth_Floor_Kwh, Utilities_Kwh, TOTAL_Kwh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     row["dateTime"],
                     row["1st_Floor"],
                     row["2nd_Floor"],
@@ -285,7 +278,7 @@ def setup_database(db_table_name):
     return
 
 
-def check_for_duplicates(old, new,db_table_name):
+def check_for_duplicates(old, new, db_table_name):
     if old is None:
         old = get_from_space(db_table_name)
         if len(old) == 0:
@@ -340,7 +333,7 @@ def main(argv):
             data_check = True
         # data_check must be true to send data to database
         if data_check == True:
-            send_to_space(rocket)
+            send_to_space(rocket, table_name)
             old_rocket = rocket
             print("[INFO]  " + " Rocket Liftoff!")
         print("[INFO]  " + "sleeping until next data pull...")
