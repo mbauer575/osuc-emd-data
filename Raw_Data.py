@@ -84,11 +84,16 @@ def calculated_data(ID_LIST, fill_mode=False):
         print("[INFO]  " + "Data collected at " + str(df_5min_master["Time"]))
         df_5min_master = df_5min_master.to_frame().T
     if df_5min_master.isnull().values.any() and fill_mode == False:
-        # Wait 20 seconds and try to collect data agian then recalculate
-        print("[CAUTION/WARN]  " + "Missing Data...Waiting 20 seconds to try again...")
-        time.sleep(20)
-        download_data()
-        calculated_data(ID_LIST)
+        # Find the missing data point
+        missing_data_point = df_5min_master[df_5min_master.isnull().any(axis=1)]
+        print(
+            "[CAUTION/WARN]  "
+            + "Missing Data at "
+            + str(missing_data_point["Time"])
+            + "...Skipping this data point..."
+        )
+        # Remove the missing data point from the dataframe
+        df_5min_master = df_5min_master.dropna()
     elif df_5min_master.isnull().values.any() and fill_mode == True:
         # Find any rows with missing data and delete the whole row
         print("[CAUTION/WARN]  " + "Missing Data...Deleting rows with missing data...")
@@ -97,6 +102,7 @@ def calculated_data(ID_LIST, fill_mode=False):
     # Data checking complete, continue with calculations
 
     # combine date and time into dateTime column
+
     df_5min_master["dateTime"] = pd.to_datetime(
         df_5min_master["Date"] + " " + df_5min_master["Time"]
     )
